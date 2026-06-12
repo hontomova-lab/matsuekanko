@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>松江市エリアブランディング戦略策定 タスク管理</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Meiryo', 'Yu Gothic UI', 'Hiragino Sans', sans-serif;
+      background: #F0F2F5;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* ── ヘッダー ── */
+    .header {
+      background: #00695C; /* 松江観光を意識した落ち着いた緑系 */
+      color: #fff;
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+    .header h1 { font-size: 16px; font-weight: bold; letter-spacing: 0.05em; }
+    .header-right { font-size: 11px; opacity: 0.75; text-align: right; line-height: 1.6; }
+
+    /* ── コントロールバー ── */
+    .controls {
+      background: #fff;
+      border-bottom: 1px solid #DDE;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .controls label { font-size: 12px; color: #555; white-space: nowrap; }
+    .controls input[type="date"], .controls select {
+      font-size: 12px; padding: 4px 8px;
+      border: 1px solid #CCC; border-radius: 4px;
+      background: #fff;
+    }
+    .btn {
+      padding: 5px 14px;
+      background: #00695C; color: #fff;
+      border: none; border-radius: 4px;
+      cursor: pointer; font-size: 12px;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #004D40; }
+    .status-msg { font-size: 12px; color: #777; margin-left: 4px; }
+
+    /* ── 凡例 ── */
+    .legend-bar {
+      background: #fff;
+      border-bottom: 1px solid #DDE;
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: #444;
+    }
+    .legend-swatch {
+      width: 14px; height: 14px;
+      border-radius: 3px; flex-shrink: 0;
+    }
+    .legend-sep { color: #CCC; }
+
+    /* ── ガントエリア ── */
+    .gantt-wrapper {
+      padding: 20px 24px;
+      overflow-x: auto;
+    }
+    .gantt-svg {
+      display: block;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+
+    /* ── エラー・空状態 ── */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+      font-size: 14px;
+    }
+
+    /* ── ツールチップ ── */
+    .tooltip {
+      position: fixed;
+      background: rgba(20,20,40,0.92);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      line-height: 1.7;
+      pointer-events: none;
+      display: none;
+      z-index: 200;
+      max-width: 320px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    .tooltip strong { font-size: 13px; display: block; margin-bottom: 4px; }
+    .tooltip .tt-row { display: flex; gap: 8px; }
+    .tooltip .tt-label { color: #AAB; min-width: 86px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>松江市エリアブランディング戦略策定 タスク管理</h1>
+  <div class="header-right">
+    <div id="lastUpdated"></div>
+    <div>エブリプラン・グレイスデザイン コンソーシアム</div>
+  </div>
+</div>
+
+<div class="controls">
+  <label>表示期間：</label>
+  <input type="date" id="startDate">
+  <span style="font-size:12px;color:#888">〜</span>
+  <input type="date" id="endDate">
+  <span style="color:#CCC">｜</span>
+  <label>並び替え：</label>
+  <select id="sortMode">
+    <option value="cat_date">大項目 → 開始日</option>
+    <option value="status_date">ステータス → 開始日</option>
+    <option value="date">開始日</option>
+  </select>
+  <span style="color:#CCC">｜</span>
+  <button class="btn" id="toggleCompleted" style="background:#5C6BC0" onclick="toggleCompleted()"
+    title="完了のタスクを表示/非表示で切り替える">完了を非表示</button>
+  <button class="btn" onclick="reload()">↺ 更新</button>
+  <span style="color:#CCC">｜</span>
+  <label style="cursor:pointer" title="手元のCSVファイルを読み込む">
+    <input type="file" id="csvFile" accept=".csv,text/csv" style="display:none">
+    <span class="btn" style="background:#5C6BC0">📂 CSV読込</span>
+  </label>
+  <span class="status-msg" id="statusMsg"></span>
+</div>
+
+<div class="legend-bar" id="legendBar"></div>
+
+<div class="gantt-wrapper">
+  <svg id="ganttSvg" class="gantt-svg"></svg>
+  <div id="emptyState" class="empty-state" style="display:none">
+    データがありません。スプレッドシートのURLを設定してください。
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════╗
+// ║  設定                                                      ║
+// ╚══════════════════════════════════════════════════════════╝
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1UJWFtEkOwwp8KAv9K8SdSst3zJH77tNiw3GoclUNqzo/export?format=csv&gid=1928092657'; // ここに実際の公開URLを設定してください
+
+// localStorageに保存されたURLを優先（なければ既定値）
+const LS_KEY = 'matsue_sheet_csv_url';
+function getSheetUrl() {
+  return (localStorage.getItem(LS_KEY) || SHEET_CSV_URL || '').trim();
+}
+
+// URL欄の保存／読込
+function saveUrl() {
+  const v = document.getElementById('sheetUrl').value.trim();
+  if (!v) { alert('CSV公開URLを入力してください。'); return; }
+  localStorage.setItem(LS_KEY, v);
+  reload();
+}
+function clearUrl() {
+  localStorage.removeItem(LS_KEY);
+  document.getElementById('sheetUrl').value = '';
+  const msg = document.getElementById('statusMsg');
+  msg.style.color = '';
+  msg.textContent = 'URLを解除しました。既定のURLまたは📂 CSV読込で手元ファイルを読み込めます。';
+  reload();
+}
+
+// ────────────────────────────────────────────────────────────
+// ステータス定義
+const STATUSES = {
+  '未着手': { color: '#9E9E9E', light: '#F5F5F5' },
+  '進行中': { color: '#2196F3', light: '#E3F2FD' },
+  '完了':   { color: '#4CAF50', light: '#E8F5E9' },
+  '保留':   { color: '#FF9800', light: '#FFF3E0' },
+};
+
+// 完了ステータス（フィルタ対象）
+const COMPLETED_STATUSES = ['完了'];
+
+// 担当組織のカラー定義
+const ORG_COLORS = {
+  'エブリプラン': '#3F51B5',
+  'グレイスデザイン': '#E91E63',
+  '両者': '#9C27B0',
+  '観光協会': '#009688',
+};
+
+// マイルストーン定義
+const MILESTONES = [
+  { col: '打合せ', label: '打合', shape: 'circle', color: '#2196F3' },
+  { col: '提出',   label: '提出', shape: 'diamond', color: '#E53935' },
+  { col: '承認',   label: '承認', shape: 'doubleCircle', color: '#4CAF50' },
+];
+
+// 期間バーの定義
+const DURATION_COLS = ['開始日', '終了日'];
+
+// レイアウト定数
+const L = {
+  INFO_W:   360, // 左パネルの幅（担当者名などを表示するため少し広め）
+  PAD_L:    12,
+  PAD_R:    24,
+  ROW_H:    52,
+  HEAD_H:   44,
+  PPD:      16,
+  BAR_H:    14,
+  MS_SIZE:  7,
+  CAT_SEP_H: 26,  // 大項目セパレーターの高さ
+};
+
+// ────────────────────────────────────────────────────────────
+let rows = [];
+let hideCompleted = false;
+
+// 完了非表示トグル
+function toggleCompleted() {
+  hideCompleted = !hideCompleted;
+  const b = document.getElementById('toggleCompleted');
+  b.textContent  = hideCompleted ? '完了を表示' : '完了を非表示';
+  b.style.background = hideCompleted ? '#43A047' : '#5C6BC0';
+  if (rows.length) render();
+}
+
+// 日付パース
+function pd(v) {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+
+  const m1 = s.match(/^(\d{4})[\/\-](\d{1,2})$/);
+  if (m1) {
+    const d = new Date(parseInt(m1[1]), parseInt(m1[2]) - 1, 1);
+    return isNaN(d) ? null : { date: d, vague: true };
+  }
+
+  const d = new Date(s);
+  return isNaN(d) ? null : { date: d, vague: false };
+}
+
+function fmtMD(p) {
+  if (!p) return '';
+  if (p.vague) return `${p.date.getMonth()+1}月頃`;
+  return `${p.date.getMonth()+1}/${p.date.getDate()}`;
+}
+function fmtFull(p) {
+  if (!p) return '';
+  if (p.vague) return `${p.date.getFullYear()}年${p.date.getMonth()+1}月頃`;
+  return `${p.date.getFullYear()}/${p.date.getMonth()+1}/${p.date.getDate()}`;
+}
+
+// X座標計算
+function toX(date, origin) {
+  return L.INFO_W + L.PAD_L + ((date - origin) / 86400000) * L.PPD;
+}
+
+// ────────────────────────────────────────────────────────────
+// CSVテキスト → オブジェクト配列（見出し行を自動検出）
+// スプレッドシート1行目にタイトル行があっても、「タスク名」を含む行を
+// 見出しとして扱うことで吸収する。
+const REQUIRED_HEADER = 'タスク名';
+function parseCsvText(text) {
+  const r = Papa.parse(text, { skipEmptyLines: true });
+  if (r.errors && r.errors.length) console.warn('[CSV parse warnings]', r.errors);
+  const grid = r.data;
+  if (!grid || grid.length === 0) throw new Error('CSVが空でした');
+
+  // 見出し行を検出（「タスク名」を含む行）
+  let hi = grid.findIndex(row => Array.isArray(row) && row.some(c => String(c).trim() === REQUIRED_HEADER));
+  if (hi === -1) hi = 0; // 見つからなければ先頭を見出しとみなす
+  const headers = grid[hi].map(c => String(c).trim());
+
+  const out = [];
+  for (let i = hi + 1; i < grid.length; i++) {
+    const cells = grid[i];
+    if (!cells || cells.every(c => String(c).trim() === '')) continue; // 空行スキップ
+    const obj = {};
+    headers.forEach((h, ci) => {
+      if (!h) return;
+      obj[h] = cells[ci] !== undefined && cells[ci] !== null ? String(cells[ci]).trim() : '';
+    });
+    out.push(obj);
+  }
+  return out;
+}
+
+// データ読み込み（CSV公開URL → テキスト → parseCsvText）
+async function loadSheet(url) {
+  const res = await fetch(url, { redirect: 'follow', cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+  const text = await res.text();
+  return parseCsvText(text);
+}
+
+function processData(data, sourceLabel) {
+  const msg = document.getElementById('statusMsg');
+  
+  rows = data
+    .filter(r => r['タスク名'] && r['タスク名'].trim())
+    .map(r => {
+      const dates = {};
+      MILESTONES.forEach(m => { dates[m.col] = pd(r[m.col]); });
+      DURATION_COLS.forEach(c => { dates[c] = pd(r[c]); });
+      return { ...r, dates };
+    });
+
+  document.getElementById('lastUpdated').textContent =
+    `最終更新：${new Date().toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}`;
+  msg.style.color = '';
+  msg.textContent = `${rows.length} 件 / ${sourceLabel || 'スプレッドシート'}`;
+  render();
+}
+
+async function reload() {
+  const msg = document.getElementById('statusMsg');
+  msg.style.color = '';
+  msg.textContent = '読み込み中…';
+
+  const url = getSheetUrl();
+  if (!url) {
+    loadSample();
+    return;
+  }
+
+  if (location.protocol === 'file:') {
+    msg.textContent = 'CORSのため file:// から外部読込は不可。📂 CSV読込か、ローカルサーバー（http）／GitHub Pages経由で開いてください';
+    msg.style.color = '#E53935';
+    return;
+  }
+
+  try {
+    const data = await loadSheet(url);
+    processData(data, 'スプレッドシート');
+  } catch (e) {
+    msg.textContent = `エラー：${e && e.message ? e.message : 'データを読み込めませんでした'}（URL・共有設定をご確認ください）`;
+    msg.style.color = '#E53935';
+    console.error('[reload] error:', e);
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// 並び替え
+function sortRows(arr) {
+  const mode = document.getElementById('sortMode').value;
+  const statusOrder = Object.keys(STATUSES);
+
+  const earliest = (r) => {
+    if (r.dates['開始日']) return r.dates['開始日'].date;
+    const ds = MILESTONES.map(m => r.dates[m.col]).filter(Boolean).map(p => p.date);
+    return ds.length ? Math.min(...ds) : Infinity;
+  };
+  const catKey = (r) => (r['大項目'] || '').trim();
+  const statusKey = (r) => {
+    const p = (r['ステータス'] || '').trim();
+    const i = statusOrder.indexOf(p);
+    return i === -1 ? 99 : i;
+  };
+
+  const cmp = (a, b, fns) => {
+    for (const f of fns) { 
+      let va = f(a), vb = f(b);
+      if (typeof va === 'string' && typeof vb === 'string') {
+        const v = va.localeCompare(vb);
+        if (v !== 0) return v;
+      } else {
+        const v = va - vb; 
+        if (v !== 0) return v;
+      }
+    }
+    return 0;
+  };
+
+  const sorted = [...arr];
+  if (mode === 'cat_date')      sorted.sort((a,b) => cmp(a,b,[catKey, earliest]));
+  else if (mode === 'status_date') sorted.sort((a,b) => cmp(a,b,[statusKey, earliest]));
+  else if (mode === 'date')    sorted.sort((a,b) => cmp(a,b,[earliest]));
+  return sorted;
+}
+
+// 大項目区切りの行インデックスと高さ計算
+function buildLayout(sorted) {
+  const mode = document.getElementById('sortMode').value;
+  const showCatSep = (mode === 'cat_date');
+  const items = [];
+  let y = L.HEAD_H;
+  let curCat = null;
+
+  sorted.forEach(r => {
+    const cat = (r['大項目'] || '').trim() || '（大項目未設定）';
+    if (showCatSep && cat !== curCat) {
+      items.push({ type: 'sep', cat, y });
+      y += L.CAT_SEP_H;
+      curCat = cat;
+    }
+    items.push({ type: 'row', row: r, y });
+    y += L.ROW_H;
+  });
+
+  return { items, totalH: y + 8 };
+}
+
+// ────────────────────────────────────────────────────────────
+// 描画
+function render() {
+  const svg = document.getElementById('ganttSvg');
+  const empty = document.getElementById('emptyState');
+
+  const visibleRows = hideCompleted
+    ? rows.filter(r => !COMPLETED_STATUSES.includes((r['ステータス'] || '').trim()))
+    : rows;
+
+  const msg = document.getElementById('statusMsg');
+  if (rows.length && hideCompleted) {
+    const hidden = rows.length - visibleRows.length;
+    msg.style.color = '';
+    msg.textContent = `表示 ${visibleRows.length} 件（完了 ${hidden} 件を非表示 / 全 ${rows.length} 件）`;
+  }
+
+  if (visibleRows.length === 0) {
+    svg.style.display = 'none';
+    empty.style.display = 'block';
+    empty.textContent = (rows.length && hideCompleted)
+      ? '表示できるタスクがありません（すべて完了のため非表示中）。'
+      : 'データがありません。スプレッドシートのURLを設定するか、CSVを読み込んでください。';
+    return;
+  }
+  svg.style.display = 'block';
+  empty.style.display = 'none';
+
+  // 日付範囲
+  const si = document.getElementById('startDate').value;
+  const ei = document.getElementById('endDate').value;
+  let origin = si ? new Date(si) : null;
+  let end    = ei ? new Date(ei) : null;
+
+  if (!origin || !end) {
+    const all = [];
+    visibleRows.forEach(r => Object.values(r.dates).forEach(p => { if (p) all.push(p.date); }));
+    if (all.length === 0) return;
+    if (!origin) { origin = new Date(Math.min(...all)); origin.setDate(origin.getDate() - 7); }
+    if (!end)    { end    = new Date(Math.max(...all)); end.setDate(end.getDate() + 30);    }
+  }
+
+  const totalDays = (end - origin) / 86400000;
+  const chartW    = Math.ceil(totalDays * L.PPD);
+  const totalW    = L.INFO_W + L.PAD_L + chartW + L.PAD_R;
+
+  const sorted = sortRows(visibleRows);
+  const layout = buildLayout(sorted);
+  const totalH = layout.totalH;
+
+  svg.setAttribute('width',   totalW);
+  svg.setAttribute('height',  totalH);
+  svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+
+  let h = '';
+
+  // 背景
+  h += `<rect width="${totalW}" height="${totalH}" fill="#fff"/>`;
+
+  // グリッド・ヘッダー
+  h += drawGrid(origin, end, totalDays, chartW, totalH, totalW);
+
+  // 行
+  let rowIdx = 0;
+  layout.items.forEach(it => {
+    if (it.type === 'sep') {
+      h += drawCatSeparator(it, totalW);
+    } else {
+      h += drawRow(it.row, rowIdx, it.y, origin, end, totalDays, chartW, totalW);
+      rowIdx++;
+    }
+  });
+
+  // 今日線
+  const today = new Date();
+  if (today >= origin && today <= end) {
+    const tx = toX(today, origin);
+    h += `<line x1="${tx}" y1="0" x2="${tx}" y2="${totalH}"
+            stroke="#E53935" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.8"/>`;
+    h += `<text x="${tx+3}" y="${L.HEAD_H - 6}"
+            fill="#E53935" font-size="10" font-family="Meiryo">今日</text>`;
+  }
+
+  // 左パネル区切り線
+  h += `<line x1="${L.INFO_W}" y1="0" x2="${L.INFO_W}" y2="${totalH}"
+          stroke="#C5CAE9" stroke-width="1"/>`;
+
+  svg.innerHTML = h;
+
+  attachTooltips(layout);
+  drawLegend();
+}
+
+// ────────────────────────────────────────────────────────────
+// 大項目セパレーター
+function drawCatSeparator(it, totalW) {
+  let h = '';
+  h += `<rect x="0" y="${it.y}" width="${totalW}" height="${L.CAT_SEP_H}" fill="#E0F2F1"/>`;
+  h += `<line x1="0" y1="${it.y}" x2="${totalW}" y2="${it.y}"
+          stroke="#B2DFDB" stroke-width="1"/>`;
+  h += `<text x="12" y="${it.y + L.CAT_SEP_H/2 + 4}"
+          fill="#00695C" font-size="12" font-family="Meiryo" font-weight="bold">${esc(it.cat)}</text>`;
+  return h;
+}
+
+// ────────────────────────────────────────────────────────────
+// グリッド・時間軸ヘッダー
+function drawGrid(origin, end, totalDays, chartW, totalH, totalW) {
+  let h = '';
+
+  // ヘッダー背景
+  h += `<rect x="0" y="0" width="${totalW}" height="${L.HEAD_H}" fill="#E8EAF6"/>`;
+
+  // 月グリッド
+  const cur = new Date(origin);
+  cur.setDate(1);
+  while (cur <= end) {
+    const x = toX(cur, origin);
+    if (x >= L.INFO_W) {
+      const lbl = `${cur.getFullYear()}年${cur.getMonth()+1}月`;
+      h += `<line x1="${x}" y1="0" x2="${x}" y2="${totalH}"
+              stroke="#C5CAE9" stroke-width="1" opacity="0.6"/>`;
+      h += `<text x="${x+5}" y="${L.HEAD_H/2+2}"
+              fill="#3949AB" font-size="11" font-family="Meiryo" font-weight="bold">${lbl}</text>`;
+    }
+    cur.setMonth(cur.getMonth() + 1);
+  }
+
+  // 週グリッド
+  const wk = new Date(origin);
+  const dow = wk.getDay();
+  wk.setDate(wk.getDate() + (dow === 1 ? 0 : dow === 0 ? 1 : 8 - dow));
+  while (wk <= end) {
+    const x = toX(wk, origin);
+    if (x >= L.INFO_W) {
+      h += `<line x1="${x}" y1="${L.HEAD_H}" x2="${x}" y2="${totalH}"
+              stroke="#E8EAF6" stroke-width="1"/>`;
+      h += `<text x="${x+2}" y="${L.HEAD_H-5}"
+              fill="#9FA8DA" font-size="9" font-family="Meiryo">${wk.getMonth()+1}/${wk.getDate()}</text>`;
+    }
+    wk.setDate(wk.getDate() + 7);
+  }
+
+  // 左ヘッダーテキスト
+  h += `<text x="12" y="${L.HEAD_H/2+5}"
+          fill="#3949AB" font-size="12" font-family="Meiryo" font-weight="bold">タスク名</text>`;
+  h += `<text x="${L.INFO_W - 130}" y="${L.HEAD_H/2+5}"
+          fill="#3949AB" font-size="12" font-family="Meiryo" font-weight="bold">担当組織・担当者</text>`;
+
+  return h;
+}
+
+// ────────────────────────────────────────────────────────────
+// 1行分の描画
+function drawRow(row, i, y, origin, end, totalDays, chartW, totalW) {
+  let h = '';
+  const status = row['ステータス'] || '未着手';
+  const sc   = (STATUSES[status] || STATUSES['未着手']);
+  const col  = sc.color;
+
+  // 交互背景
+  if (i % 2 === 1) {
+    h += `<rect x="0" y="${y}" width="${totalW}" height="${L.ROW_H}" fill="#FAFBFF"/>`;
+  }
+  // 下線
+  h += `<line x1="0" y1="${y+L.ROW_H}" x2="${totalW}" y2="${y+L.ROW_H}"
+          stroke="#E8EAF6" stroke-width="1"/>`;
+
+  // ステータス帯（左端4px）
+  h += `<rect x="0" y="${y}" width="4" height="${L.ROW_H}" fill="${col}"/>`;
+
+  // ── 左情報パネル ──
+  const name = row['タスク名'] || '';
+  const nameShort = name.length > 20 ? name.slice(0, 20) + '…' : name;
+  const sub = row['中項目'] || '';
+
+  h += `<text x="12" y="${y+18}" fill="#222" font-size="12" font-family="Meiryo"
+          font-weight="500" data-idx="${i}" class="row-label">${esc(nameShort)}</text>`;
+  h += `<text x="12" y="${y+33}" fill="#888" font-size="10" font-family="Meiryo"
+          >${esc(sub.slice(0,32))}</text>`;
+
+  // 担当組織バッジ
+  const org = (row['担当組織'] || '').trim();
+  const orgColor = ORG_COLORS[org] || '#9E9E9E';
+  const bx = L.INFO_W - 130;
+  
+  if (org) {
+    h += `<rect x="${bx}" y="${y+14}" width="60" height="20" rx="3"
+            fill="${orgColor}" opacity="0.15"/>`;
+    h += `<text x="${bx+30}" y="${y+28}" text-anchor="middle"
+            fill="${orgColor}" font-size="10" font-family="Meiryo" font-weight="bold"
+            data-idx="${i}" class="row-label">${esc(org)}</text>`;
+  }
+
+  // 担当者名
+  const person = row['担当者名'] || '';
+  h += `<text x="${bx+66}" y="${y+28}" fill="#555" font-size="11" font-family="Meiryo"
+          data-idx="${i}" class="row-label">${esc(person)}</text>`;
+
+  // ── スケジュールバー（開始日〜終了日） ──
+  const dStart = row.dates['開始日'];
+  const dEnd = row.dates['終了日'];
+
+  if (dStart && dEnd) {
+    const x1 = Math.max(toX(dStart.date, origin), L.INFO_W + L.PAD_L);
+    const x2 = Math.min(toX(dEnd.date, origin), L.INFO_W + L.PAD_L + chartW);
+    if (x2 >= x1) {
+      const barW = Math.max(x2 - x1, 4); // 最低4px幅
+      const by = y + L.ROW_H/2 - L.BAR_H/2;
+      h += `<rect x="${x1}" y="${by}" width="${barW}" height="${L.BAR_H}"
+              rx="4" fill="${col}" opacity="0.6" data-idx="${i}" class="row-bar"/>`;
+    }
+  } else if (dStart) {
+    // 終了日がない場合は開始日のみポイント表示
+    const x1 = Math.max(toX(dStart.date, origin), L.INFO_W + L.PAD_L);
+    const by = y + L.ROW_H/2 - L.BAR_H/2;
+    h += `<rect x="${x1}" y="${by}" width="8" height="${L.BAR_H}"
+            rx="4" fill="${col}" opacity="0.6" data-idx="${i}" class="row-bar"/>`;
+  }
+
+  // ── マイルストーン ──
+  MILESTONES.forEach(m => {
+    const p = row.dates[m.col];
+    if (!p) return;
+    const mx = toX(p.date, origin);
+    if (mx < L.INFO_W + L.PAD_L || mx > L.INFO_W + L.PAD_L + chartW) return;
+    const my = y + L.ROW_H / 2;
+    const msColor = m.color;
+
+    if (m.shape === 'circle') {
+      h += `<circle cx="${mx}" cy="${my}" r="5.5"
+              fill="${msColor}" data-idx="${i}" data-ms="${m.col}" data-dt="${fmtFull(p)}" class="ms"/>`;
+    } else if (m.shape === 'doubleCircle') {
+      // ◎ 二重丸
+      h += `<circle cx="${mx}" cy="${my}" r="6.5" fill="#fff" stroke="${msColor}" stroke-width="1.8"
+              data-idx="${i}" data-ms="${m.col}" data-dt="${fmtFull(p)}" class="ms"/>`;
+      h += `<circle cx="${mx}" cy="${my}" r="3" fill="${msColor}"
+              data-idx="${i}" data-ms="${m.col}" data-dt="${fmtFull(p)}" class="ms"/>`;
+    } else {
+      // ◆ 菱形
+      const s = L.MS_SIZE + 2;
+      h += `<polygon points="${mx},${my-s} ${mx+s},${my} ${mx},${my+s} ${mx-s},${my}"
+              fill="${msColor}" data-idx="${i}" data-ms="${m.col}" data-dt="${fmtFull(p)}" class="ms"/>`;
+    }
+
+    // 日付ラベル
+    h += `<text x="${mx}" y="${y+L.ROW_H-4}" text-anchor="middle"
+            fill="${msColor}" font-size="9" font-family="Meiryo" opacity="0.9">${fmtMD(p)}</text>`;
+  });
+
+  return h;
+}
+
+// ────────────────────────────────────────────────────────────
+// ツールチップ
+function attachTooltips(layout) {
+  const svg = document.getElementById('ganttSvg');
+  const tip = document.getElementById('tooltip');
+
+  const idxToRow = [];
+  layout.items.forEach(it => { if (it.type === 'row') idxToRow.push(it.row); });
+
+  svg.addEventListener('mousemove', e => {
+    const el = e.target;
+    const idx = el.getAttribute('data-idx');
+    if (idx === null) { tip.style.display = 'none'; return; }
+
+    const row = idxToRow[parseInt(idx)];
+    if (!row) return;
+
+    const msCol = el.getAttribute('data-ms');
+    const status = row['ステータス'] || '未着手';
+    const col   = (STATUSES[status] || STATUSES['未着手']).color;
+
+    let html = `<strong>${esc(row['タスク名'] || '')}</strong>`;
+    if (row['大項目']) html += `<div class="tt-row"><span class="tt-label">大項目</span><span>${esc(row['大項目'])}</span></div>`;
+    if (row['中項目']) html += `<div class="tt-row"><span class="tt-label">中項目</span><span>${esc(row['中項目'])}</span></div>`;
+    html += `<div class="tt-row"><span class="tt-label">担当</span><span>${esc(row['担当組織']||'-')} ${esc(row['担当者名']||'')}</span></div>`;
+    html += `<div class="tt-row"><span class="tt-label">ステータス</span><span style="color:${col};font-weight:bold">${esc(status)}</span></div>`;
+
+    if (msCol) {
+      const dt = el.getAttribute('data-dt');
+      html += `<div class="tt-row" style="margin-top:4px;border-top:1px solid #555;padding-top:4px">
+                 <span class="tt-label">${esc(msCol)}</span><span style="font-weight:bold">${esc(dt)}</span></div>`;
+    } else {
+      const sDate = row.dates['開始日'] ? fmtFull(row.dates['開始日']) : '-';
+      const eDate = row.dates['終了日'] ? fmtFull(row.dates['終了日']) : '-';
+      html += `<div class="tt-row" style="margin-top:4px;border-top:1px solid #555;padding-top:4px">
+                 <span class="tt-label">期間</span><span>${sDate} 〜 ${eDate}</span></div>`;
+    }
+
+    if (row['備考']) {
+      html += `<div class="tt-row" style="margin-top:4px;border-top:1px solid #555;padding-top:4px">
+                 <span class="tt-label">備考</span><span style="white-space:pre-wrap">${esc(row['備考'])}</span></div>`;
+    }
+
+    tip.innerHTML = html;
+    tip.style.display = 'block';
+
+    const tw = 320, th = tip.offsetHeight;
+    let tx = e.clientX + 14, ty = e.clientY - 20;
+    if (tx + tw > window.innerWidth)  tx = e.clientX - tw - 14;
+    if (ty + th > window.innerHeight) ty = e.clientY - th - 10;
+    tip.style.left = tx + 'px';
+    tip.style.top  = ty + 'px';
+  });
+
+  svg.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+}
+
+// ────────────────────────────────────────────────────────────
+// 凡例
+function drawLegend() {
+  const bar = document.getElementById('legendBar');
+  let h = '';
+  Object.entries(STATUSES).forEach(([name, sc]) => {
+    h += `<div class="legend-item">
+            <div class="legend-swatch" style="background:${sc.color}"></div>
+            <span>${name}</span>
+          </div>`;
+  });
+  h += `<span class="legend-sep">｜</span>`;
+  h += `<div class="legend-item" style="color:#2196F3">● 打合せ</div>`;
+  h += `<div class="legend-item" style="color:#E53935">◆ 提出</div>`;
+  h += `<div class="legend-item" style="color:#4CAF50">◎ 承認</div>`;
+  h += `<span class="legend-sep">｜</span>`;
+  h += `<div class="legend-item" style="color:#E53935">─ 今日</div>`;
+  bar.innerHTML = h;
+}
+
+// SVGエスケープ
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ────────────────────────────────────────────────────────────
+// 初期化
+window.addEventListener('DOMContentLoaded', () => {
+  const now = new Date();
+  const s = new Date(now.getFullYear(), now.getMonth(), 1);
+  const e = new Date(now.getFullYear(), now.getMonth() + 4, 0);
+  document.getElementById('startDate').value = s.toISOString().split('T')[0];
+  document.getElementById('endDate').value   = e.toISOString().split('T')[0];
+
+  document.getElementById('sortMode').addEventListener('change', () => {
+    if (rows.length) render();
+  });
+
+  // ローカルCSV読み込み
+  document.getElementById('csvFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = parseCsvText(reader.result);
+        processData(data, `${file.name}（ローカル読込）`);
+      } catch (err) {
+        const msg = document.getElementById('statusMsg');
+        msg.textContent = `エラー：${err.message}`;
+        msg.style.color = '#E53935';
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  });
+
+  // 保存済みURLをURL欄に復元
+  const saved = getSheetUrl();
+  if (saved) document.getElementById('sheetUrl').value = saved;
+
+  drawLegend();
+  reload();
+});
+
+// ────────────────────────────────────────────────────────────
+// サンプルデータ
+function loadSample() {
+  document.getElementById('statusMsg').textContent = 'CSVを読み込んでください。';
+  // サンプルデータは空にしておき、ユーザーにCSVを読み込ませる
+  rows = [];
+  render();
+}
+</script>
+</body>
+</html>
