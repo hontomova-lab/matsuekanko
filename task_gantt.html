@@ -310,7 +310,11 @@ function parseCsvText(text) {
 
 // データ読み込み（CSV公開URL → テキスト → parseCsvText）
 async function loadSheet(url) {
-  const res = await fetch(url, { redirect: 'follow', cache: 'no-store' });
+  // キャッシュバスターとして現在時刻を付与し、常に最新を取得する
+  const cacheBuster = `&_t=${new Date().getTime()}`;
+  const fetchUrl = url.includes('?') ? url + cacheBuster : url + '?' + cacheBuster.substring(1);
+  
+  const res = await fetch(fetchUrl, { redirect: 'follow', cache: 'no-store' });
   if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
   const text = await res.text();
   return parseCsvText(text);
@@ -775,11 +779,20 @@ function esc(s) {
 // ────────────────────────────────────────────────────────────
 // 初期化
 window.addEventListener('DOMContentLoaded', () => {
-  const now = new Date();
-  const s = new Date(now.getFullYear(), now.getMonth(), 1);
-  const e = new Date(now.getFullYear(), now.getMonth() + 4, 0);
-  document.getElementById('startDate').value = s.toISOString().split('T')[0];
-  document.getElementById('endDate').value   = e.toISOString().split('T')[0];
+  // デフォルト表示期間：2026年6月15日開始、4ヶ月後末日終了
+  const s = new Date(2026, 5, 15); // 5 = 6月 (0-indexed)
+  const e = new Date(2026, 9, 0);  // 9, 0 = 9月末日
+  
+  // タイムゾーンのズレを防ぐため、ローカル時刻でYYYY-MM-DD文字列を生成
+  const fmtDate = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  document.getElementById('startDate').value = fmtDate(s);
+  document.getElementById('endDate').value   = fmtDate(e);
 
   document.getElementById('sortMode').addEventListener('change', () => {
     if (rows.length) render();
