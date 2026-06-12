@@ -222,7 +222,7 @@ const DURATION_COLS = ['開始日', '終了日'];
 
 // レイアウト定数
 const L = {
-  INFO_W:   360, // 左パネルの幅（担当者名などを表示するため少し広め）
+  INFO_W:   420, // 左パネルの幅（中項目・タスク名・担当を表示するため広げる）
   PAD_L:    12,
   PAD_R:    24,
   ROW_H:    52,
@@ -507,7 +507,7 @@ function render() {
   }
 
   // 左パネル区切り線
-  h += `<line x1="110" y1="${L.HEAD_H}" x2="110" y2="${totalH}"
+  h += `<line x1="130" y1="${L.HEAD_H}" x2="130" y2="${totalH}"
           stroke="#E8EAF6" stroke-width="1"/>`;
   h += `<line x1="${L.INFO_W}" y1="0" x2="${L.INFO_W}" y2="${totalH}"
           stroke="#C5CAE9" stroke-width="1"/>`;
@@ -571,9 +571,9 @@ function drawGrid(origin, end, totalDays, chartW, totalH, totalW) {
   // 左ヘッダーテキスト
   h += `<text x="12" y="${L.HEAD_H/2+5}"
           fill="#3949AB" font-size="12" font-family="Meiryo" font-weight="bold">中項目</text>`;
-  h += `<text x="120" y="${L.HEAD_H/2+5}"
+  h += `<text x="140" y="${L.HEAD_H/2+5}"
           fill="#3949AB" font-size="12" font-family="Meiryo" font-weight="bold">タスク名</text>`;
-  h += `<text x="${L.INFO_W - 130}" y="${L.HEAD_H/2+5}"
+  h += `<text x="${L.INFO_W - 140}" y="${L.HEAD_H/2+5}"
           fill="#3949AB" font-size="12" font-family="Meiryo" font-weight="bold">担当組織・担当者</text>`;
 
   return h;
@@ -611,13 +611,13 @@ function drawRow(row, i, y, origin, end, totalDays, chartW, totalW, sorted) {
             font-weight="bold">${esc(sub)}</text>`;
   }
 
-  h += `<text x="120" y="${y+28}" fill="#222" font-size="12" font-family="Meiryo"
+  h += `<text x="140" y="${y+28}" fill="#222" font-size="12" font-family="Meiryo"
           font-weight="500" data-idx="${i}" class="row-label">${esc(nameShort)}</text>`;
 
   // 担当組織バッジ
   const org = (row['担当組織'] || '').trim();
   const orgColor = ORG_COLORS[org] || '#9E9E9E';
-  const bx = L.INFO_W - 130;
+  const bx = L.INFO_W - 140;
   
   if (org) {
     h += `<rect x="${bx}" y="${y+14}" width="60" height="20" rx="3"
