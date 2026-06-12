@@ -174,16 +174,19 @@ function getSheetUrl() {
   return (localStorage.getItem(LS_KEY) || SHEET_CSV_URL || '').trim();
 }
 
-// URL欄の保存／読込
+// URL欄の保存／読込（URL入力欄がある場合のみ）
 function saveUrl() {
-  const v = document.getElementById('sheetUrl').value.trim();
+  const el = document.getElementById('sheetUrl');
+  if (!el) return;
+  const v = el.value.trim();
   if (!v) { alert('CSV公開URLを入力してください。'); return; }
   localStorage.setItem(LS_KEY, v);
   reload();
 }
 function clearUrl() {
   localStorage.removeItem(LS_KEY);
-  document.getElementById('sheetUrl').value = '';
+  const el = document.getElementById('sheetUrl');
+  if (el) el.value = '';
   const msg = document.getElementById('statusMsg');
   msg.style.color = '';
   msg.textContent = 'URLを解除しました。既定のURLまたは📂 CSV読込で手元ファイルを読み込めます。';
@@ -816,12 +819,8 @@ window.addEventListener('DOMContentLoaded', () => {
     reader.readAsText(file, 'UTF-8');
   });
 
-  // 保存済みURLをURL欄に復元
-  const saved = getSheetUrl();
-  if (saved) document.getElementById('sheetUrl').value = saved;
-
   drawLegend();
-  reload();
+  reload(); // ページを開いたら自動でスプレッドシートを読み込む
 });
 
 // ────────────────────────────────────────────────────────────
