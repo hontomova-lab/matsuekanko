@@ -491,7 +491,7 @@ function render() {
     if (it.type === 'sep') {
       h += drawCatSeparator(it, totalW);
     } else {
-      h += drawRow(it.row, rowIdx, it.y, origin, end, totalDays, chartW, totalW);
+      h += drawRow(it.row, rowIdx, it.y, origin, end, totalDays, chartW, totalW, sorted);
       rowIdx++;
     }
   });
@@ -507,6 +507,8 @@ function render() {
   }
 
   // 左パネル区切り線
+  h += `<line x1="110" y1="${L.HEAD_H}" x2="110" y2="${totalH}"
+          stroke="#E8EAF6" stroke-width="1"/>`;
   h += `<line x1="${L.INFO_W}" y1="0" x2="${L.INFO_W}" y2="${totalH}"
           stroke="#C5CAE9" stroke-width="1"/>`;
 
@@ -568,6 +570,8 @@ function drawGrid(origin, end, totalDays, chartW, totalH, totalW) {
 
   // 左ヘッダーテキスト
   h += `<text x="12" y="${L.HEAD_H/2+5}"
+          fill="#3949AB" font-size="12" font-family="Meiryo" font-weight="bold">中項目</text>`;
+  h += `<text x="120" y="${L.HEAD_H/2+5}"
           fill="#3949AB" font-size="12" font-family="Meiryo" font-weight="bold">タスク名</text>`;
   h += `<text x="${L.INFO_W - 130}" y="${L.HEAD_H/2+5}"
           fill="#3949AB" font-size="12" font-family="Meiryo" font-weight="bold">担当組織・担当者</text>`;
@@ -577,7 +581,7 @@ function drawGrid(origin, end, totalDays, chartW, totalH, totalW) {
 
 // ────────────────────────────────────────────────────────────
 // 1行分の描画
-function drawRow(row, i, y, origin, end, totalDays, chartW, totalW) {
+function drawRow(row, i, y, origin, end, totalDays, chartW, totalW, sorted) {
   let h = '';
   const status = row['ステータス'] || '未着手';
   const sc   = (STATUSES[status] || STATUSES['未着手']);
@@ -599,10 +603,16 @@ function drawRow(row, i, y, origin, end, totalDays, chartW, totalW) {
   const nameShort = name.length > 20 ? name.slice(0, 20) + '…' : name;
   const sub = row['中項目'] || '';
 
-  h += `<text x="12" y="${y+18}" fill="#222" font-size="12" font-family="Meiryo"
+  // 中項目が前の行と同じなら表示しない（グループ化して見せる）
+  const isFirstInSub = i === 0 || (sorted[i-1] && (sorted[i-1]['中項目'] || '') !== sub);
+  
+  if (isFirstInSub && sub) {
+    h += `<text x="12" y="${y+28}" fill="#555" font-size="11" font-family="Meiryo"
+            font-weight="bold">${esc(sub)}</text>`;
+  }
+
+  h += `<text x="120" y="${y+28}" fill="#222" font-size="12" font-family="Meiryo"
           font-weight="500" data-idx="${i}" class="row-label">${esc(nameShort)}</text>`;
-  h += `<text x="12" y="${y+33}" fill="#888" font-size="10" font-family="Meiryo"
-          >${esc(sub.slice(0,32))}</text>`;
 
   // 担当組織バッジ
   const org = (row['担当組織'] || '').trim();
