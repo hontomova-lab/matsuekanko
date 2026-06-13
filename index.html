@@ -135,6 +135,7 @@
   <span style="color:#CCC">｜</span>
   <label>並び替え：</label>
   <select id="sortMode">
+    <option value="sheet_order">スプレッドシート順</option>
     <option value="cat_date">大項目 → 開始日</option>
     <option value="status_date">ステータス → 開始日</option>
     <option value="date">開始日</option>
@@ -328,11 +329,11 @@ function processData(data, sourceLabel) {
   
   rows = data
     .filter(r => r['タスク名'] && r['タスク名'].trim())
-    .map(r => {
+    .map((r, i) => {
       const dates = {};
       MILESTONES.forEach(m => { dates[m.col] = pd(r[m.col]); });
       DURATION_COLS.forEach(c => { dates[c] = pd(r[c]); });
-      return { ...r, dates };
+      return { ...r, dates, _sheetOrder: i };
     });
 
   document.getElementById('lastUpdated').textContent =
@@ -402,7 +403,8 @@ function sortRows(arr) {
   };
 
   const sorted = [...arr];
-  if (mode === 'cat_date')      sorted.sort((a,b) => cmp(a,b,[catKey, earliest]));
+  if (mode === 'sheet_order')   sorted.sort((a,b) => (a._sheetOrder ?? 0) - (b._sheetOrder ?? 0));
+  else if (mode === 'cat_date')      sorted.sort((a,b) => cmp(a,b,[catKey, earliest]));
   else if (mode === 'status_date') sorted.sort((a,b) => cmp(a,b,[statusKey, earliest]));
   else if (mode === 'date')    sorted.sort((a,b) => cmp(a,b,[earliest]));
   return sorted;
@@ -411,7 +413,7 @@ function sortRows(arr) {
 // 大項目区切りの行インデックスと高さ計算
 function buildLayout(sorted) {
   const mode = document.getElementById('sortMode').value;
-  const showCatSep = (mode === 'cat_date');
+  const showCatSep = (mode === 'cat_date' || mode === 'sheet_order');
   const items = [];
   let y = L.HEAD_H;
   let curCat = null;
