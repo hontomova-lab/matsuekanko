@@ -224,17 +224,18 @@ const MILESTONES = [
 // 期間バーの定義
 const DURATION_COLS = ['開始日', '終了日'];
 
-// レイアウト定数
+// レイアウト定数（行高は従来比約70%）
 const L = {
-  INFO_W:   420, // 左パネルの幅（中項目・タスク名・担当を表示するため広げる）
+  INFO_W:   420,
   PAD_L:    12,
   PAD_R:    24,
-  ROW_H:    52,
-  HEAD_H:   44,
+  ROW_H:    36,  // 52 → 70%
+  HEAD_H:   31,  // 44 → 70%
   PPD:      16,
-  BAR_H:    14,
-  MS_SIZE:  7,
-  CAT_SEP_H: 26,  // 大項目セパレーターの高さ
+  BAR_H:    10,  // 14 → 70%
+  MS_SIZE:  5,   // 7 → 70%
+  BADGE_H:  14,  // 20 → 70%
+  CAT_SEP_H: 18, // 26 → 70%
 };
 
 // ────────────────────────────────────────────────────────────
@@ -534,8 +535,8 @@ function drawCatSeparator(it, totalW) {
   h += `<rect x="0" y="${it.y}" width="${totalW}" height="${L.CAT_SEP_H}" fill="#E0F2F1"/>`;
   h += `<line x1="0" y1="${it.y}" x2="${totalW}" y2="${it.y}"
           stroke="#B2DFDB" stroke-width="1"/>`;
-  h += `<text x="12" y="${it.y + L.CAT_SEP_H/2 + 4}"
-          fill="#00695C" font-size="12" font-family="Meiryo" font-weight="bold">${esc(it.cat)}</text>`;
+  h += `<text x="12" y="${it.y + L.CAT_SEP_H/2 + 3}"
+          fill="#00695C" font-size="10" font-family="Meiryo" font-weight="bold">${esc(it.cat)}</text>`;
   return h;
 }
 
@@ -578,12 +579,12 @@ function drawGrid(origin, end, totalDays, chartW, totalH, totalW) {
   }
 
   // 左ヘッダーテキスト
-  h += `<text x="12" y="${L.HEAD_H/2+5}"
-          fill="#3949AB" font-size="12" font-family="Meiryo" font-weight="bold">中項目</text>`;
-  h += `<text x="140" y="${L.HEAD_H/2+5}"
-          fill="#3949AB" font-size="12" font-family="Meiryo" font-weight="bold">タスク名</text>`;
-  h += `<text x="${L.INFO_W - 140}" y="${L.HEAD_H/2+5}"
-          fill="#3949AB" font-size="12" font-family="Meiryo" font-weight="bold">担当組織・担当者</text>`;
+  h += `<text x="12" y="${L.HEAD_H/2+4}"
+          fill="#3949AB" font-size="10" font-family="Meiryo" font-weight="bold">中項目</text>`;
+  h += `<text x="140" y="${L.HEAD_H/2+4}"
+          fill="#3949AB" font-size="10" font-family="Meiryo" font-weight="bold">タスク名</text>`;
+  h += `<text x="${L.INFO_W - 140}" y="${L.HEAD_H/2+4}"
+          fill="#3949AB" font-size="10" font-family="Meiryo" font-weight="bold">担当組織・担当者</text>`;
 
   return h;
 }
@@ -611,16 +612,18 @@ function drawRow(row, i, y, origin, end, totalDays, chartW, totalW, sorted) {
   const name = row['タスク名'] || '';
   const nameShort = name.length > 20 ? name.slice(0, 20) + '…' : name;
   const sub = row['中項目'] || '';
+  const textY = y + Math.round(L.ROW_H * 0.58);
+  const badgeY = y + Math.round((L.ROW_H - L.BADGE_H) / 2);
 
   // 中項目が前の行と同じなら表示しない（グループ化して見せる）
   const isFirstInSub = i === 0 || (sorted[i-1] && (sorted[i-1]['中項目'] || '') !== sub);
   
   if (isFirstInSub && sub) {
-    h += `<text x="12" y="${y+28}" fill="#555" font-size="11" font-family="Meiryo"
+    h += `<text x="12" y="${textY}" fill="#555" font-size="10" font-family="Meiryo"
             font-weight="bold">${esc(sub)}</text>`;
   }
 
-  h += `<text x="140" y="${y+28}" fill="#222" font-size="12" font-family="Meiryo"
+  h += `<text x="140" y="${textY}" fill="#222" font-size="10" font-family="Meiryo"
           font-weight="500" data-idx="${i}" class="row-label">${esc(nameShort)}</text>`;
 
   // 担当組織バッジ
@@ -629,16 +632,16 @@ function drawRow(row, i, y, origin, end, totalDays, chartW, totalW, sorted) {
   const bx = L.INFO_W - 140;
   
   if (org) {
-    h += `<rect x="${bx}" y="${y+14}" width="60" height="20" rx="3"
+    h += `<rect x="${bx}" y="${badgeY}" width="60" height="${L.BADGE_H}" rx="3"
             fill="${orgColor}" opacity="0.15"/>`;
-    h += `<text x="${bx+30}" y="${y+28}" text-anchor="middle"
-            fill="${orgColor}" font-size="10" font-family="Meiryo" font-weight="bold"
+    h += `<text x="${bx+30}" y="${textY}" text-anchor="middle"
+            fill="${orgColor}" font-size="9" font-family="Meiryo" font-weight="bold"
             data-idx="${i}" class="row-label">${esc(org)}</text>`;
   }
 
   // 担当者名
   const person = row['担当者名'] || '';
-  h += `<text x="${bx+66}" y="${y+28}" fill="#555" font-size="11" font-family="Meiryo"
+  h += `<text x="${bx+66}" y="${textY}" fill="#555" font-size="10" font-family="Meiryo"
           data-idx="${i}" class="row-label">${esc(person)}</text>`;
 
   // ── スケジュールバー（開始日〜終了日） ──
@@ -672,24 +675,24 @@ function drawRow(row, i, y, origin, end, totalDays, chartW, totalW, sorted) {
     const msColor = m.color;
 
     if (m.shape === 'circle') {
-      h += `<circle cx="${mx}" cy="${my}" r="5.5"
+      h += `<circle cx="${mx}" cy="${my}" r="${L.MS_SIZE}"
               fill="${msColor}" data-idx="${i}" data-ms="${m.col}" data-dt="${fmtFull(p)}" class="ms"/>`;
     } else if (m.shape === 'doubleCircle') {
       // ◎ 二重丸
-      h += `<circle cx="${mx}" cy="${my}" r="6.5" fill="#fff" stroke="${msColor}" stroke-width="1.8"
+      h += `<circle cx="${mx}" cy="${my}" r="${L.MS_SIZE + 1.5}" fill="#fff" stroke="${msColor}" stroke-width="1.5"
               data-idx="${i}" data-ms="${m.col}" data-dt="${fmtFull(p)}" class="ms"/>`;
-      h += `<circle cx="${mx}" cy="${my}" r="3" fill="${msColor}"
+      h += `<circle cx="${mx}" cy="${my}" r="${L.MS_SIZE - 2}" fill="${msColor}"
               data-idx="${i}" data-ms="${m.col}" data-dt="${fmtFull(p)}" class="ms"/>`;
     } else {
       // ◆ 菱形
-      const s = L.MS_SIZE + 2;
+      const s = L.MS_SIZE + 1;
       h += `<polygon points="${mx},${my-s} ${mx+s},${my} ${mx},${my+s} ${mx-s},${my}"
               fill="${msColor}" data-idx="${i}" data-ms="${m.col}" data-dt="${fmtFull(p)}" class="ms"/>`;
     }
 
     // 日付ラベル
-    h += `<text x="${mx}" y="${y+L.ROW_H-4}" text-anchor="middle"
-            fill="${msColor}" font-size="9" font-family="Meiryo" opacity="0.9">${fmtMD(p)}</text>`;
+    h += `<text x="${mx}" y="${y+L.ROW_H-3}" text-anchor="middle"
+            fill="${msColor}" font-size="8" font-family="Meiryo" opacity="0.9">${fmtMD(p)}</text>`;
   });
 
   return h;
